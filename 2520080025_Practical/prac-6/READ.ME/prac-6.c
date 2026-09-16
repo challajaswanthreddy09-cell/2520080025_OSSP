@@ -1,0 +1,71 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+#define CLIENT_FIFO "client_to_server"
+#define SERVER_FIFO "server_to_client"
+
+int main()
+{
+    char message[200];
+    char response[300];
+
+    /* Create named pipes */
+    mkfifo(CLIENT_FIFO, 0666);
+    mkfifo(SERVER_FIFO, 0666);
+
+    printf("Server started...\n");
+    printf("Waiting for client messages...\n");
+
+    while (1)
+    {
+        /* Open client FIFO for reading */
+        int read_fd = open(CLIENT_FIFO, O_RDONLY);
+
+        if (read_fd == -1)
+        {
+            perror("open client FIFO");
+            exit(EXIT_FAILURE);
+        }
+
+        /* Read message from client */
+        ssize_t bytes = read(read_fd, message, sizeof(message) - 1);
+        close(read_fd);
+
+        if (bytes > 0)
+        {
+            message[bytes] = '\0';
+
+            printf("Client message: %s\n", message);
+
+            /* Process the message */
+            snprintf(response, sizeof(response),
+                     "Server received: %s", message);
+
+            /* Open server FIFO for writing */
+            int write_fd = open(SERVER_FIFO, O_WRONLY);
+
+            if (write_fd == -1)
+            {
+                perror("open server FIFO");
+                exit(EXIT_FAILURE);
+            }
+
+            /* Send response */
+            write(write_fd, response, strlen(response) + 1);
+
+            close(write_fd);
+
+            printf("Response sent to client.\n\n");
+        }
+    }
+
+    /* Remove FIFOs */
+    unlink(CLIENT_FIFO);
+    unlink(SERVER_FIFO);
+
+    return 0;
+}
